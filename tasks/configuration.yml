@@ -3,7 +3,7 @@
   lineinfile:
     path: /etc/sysconfig/pgpool-II-{{ postgresql_version }}
     regexp: '^OPTS='
-    line: 'OPTS=" -D -n -d"'
+    line: 'OPTS=" -D -n"'
   notify:
     - restart pgpool2
 
@@ -115,8 +115,8 @@
 - name: pgpool2 | Configuration | Watchdog Configuration | postgres sudoers
   copy:
     content: |
-      Cmnd_Alias NETCFG_CMD = /sbin/ip, /sbin/ifconfig, /usr/sbin/arping
-      {{ pgpool2_user }} ALL=(ALL) NOPASSWD: NETCFG_CMD
+      Cmnd_Alias POSTGRES_CMD = /sbin/ip, /sbin/ifconfig, /usr/sbin/arping, /bin/systemctl start {{ pgpool2_service_name }}
+      {{ pgpool2_user }} ALL=(ALL) NOPASSWD: POSTGRES_CMD
     dest: /etc/sudoers.d/{{ pgpool2_user }}
     owner: root
     group: root
@@ -150,6 +150,3 @@
     - pgpool2_register_pg_monitor.rc > 0
     - not pgpool2_register_pg_monitor.stderr is search('read-only')
   ignore_errors: True
-
-- debug:
-    var: pgpool2_register_pg_monitor

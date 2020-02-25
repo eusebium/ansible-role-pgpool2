@@ -28,6 +28,7 @@
     src: "{{ pgpool2_conf_directory }}/recovery_1st_stage.sample"
     dest: "{{ pgpool2_postgresql_data_directory }}/recovery_1st_stage"
     remote_src: yes
+    force: no
     mode: 0755
 
 - name: pgpool2 | Online Recovery | recovery_1st_stage - PGHOME
@@ -41,6 +42,7 @@
     src: "{{ pgpool2_conf_directory }}/pgpool_remote_start.sample"
     dest: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
     remote_src: yes
+    force: no
     mode: 0755
 
 - name: pgpool2 | Online Recovery | pgpool_remote_start - PGHOME
@@ -48,6 +50,19 @@
     path: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
     regexp: '^PGHOME'
     line: "PGHOME=/usr/pgsql-{{ postgresql_version }}"
+
+- name: pgpool2 | Online Recovery | pgpool_remote_start - pgpool_remote_start
+  lineinfile:
+    path: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
+    regexp: '(?!#)(.*pg_ctl.*)'
+    line: '#\1'
+    backrefs: yes
+
+- name: pgpool2 | Online Recovery | pgpool_remote_start - pgpool_remote_start
+  lineinfile:
+    path: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
+    insertafter: '.*pg_ctl.*'
+    line: 'sudo /bin/systemctl start {{ pgpool2_service_name }}'
 
 - name: pgpool2 | Online Recovery | mod template1
   command: psql template1 -c "CREATE EXTENSION pgpool_recovery"
