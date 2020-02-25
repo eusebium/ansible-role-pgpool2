@@ -1,0 +1,87 @@
+---
+- meta: flush_handlers
+
+- name: pgpool2 | Online Recovery | wait for vip
+  wait_for:
+    host: "{{ pgpool2_delegate_IP }}"
+    port: "{{ pgpool2_pcp_port }}"
+    delay: 3
+
+- name: pgpool2 | Online Recovery | get nodes info
+  command: pcp_node_info -h {{ pgpool2_delegate_IP }} -U {{ pgpool2_pcp_user_name }} -p {{ pgpool2_pcp_port }} -w -n {{ index }}
+  register: pgpool2_register_node_info
+  loop: "{{ pgpool2_backends }}"
+  loop_control:
+    index_var: index
+  changed_when: False
+  delegate_to: "{{ ansible_play_batch|first }}"
+
+- name: pgpool2 | Online Recovery | set node role
+  set_fact:
+    pgpool2_node_role: "{{ item.stdout.split(' ')[5] }}"
+    pgpool2_node_index: "{{ item.index }}"
+  when: ansible_hostname == item.item.hostname
+  loop: "{{ pgpool2_register_node_info.results }}"
+
+- name: pgpool2 | Online Recovery | recovery_1st_stage
+  copy:
+    src: "{{ pgpool2_conf_directory }}/recovery_1st_stage.sample"
+    dest: "{{ pgpool2_postgresql_data_directory }}/recovery_1st_stage"
+    remote_src: yes
+    mode: 0755
+
+- name: pgpool2 | Online Recovery | recovery_1st_stage - PGHOME
+  lineinfile:
+    path: "{{ pgpool2_postgresql_data_directory }}/recovery_1st_stage"
+    regexp: '^PGHOME'
+    line: "PGHOME=/usr/pgsql-{{ postgresql_version }}"
+
+- name: pgpool2 | Online Recovery | pgpool_remote_start
+  copy:
+    src: "{{ pgpool2_conf_directory }}/pgpool_remote_start.sample"
+    dest: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
+    remote_src: yes
+    mode: 0755
+
+- name: pgpool2 | Online Recovery | pgpool_remote_start - PGHOME
+  lineinfile:
+    path: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
+    regexp: '^PGHOME'
+    line: "PGHOME=/usr/pgsql-{{ postgresql_version }}"
+
+- name: pgpool2 | Online Recovery | mod template1
+  command: psql template1 -c "CREATE EXTENSION pgpool_recovery"
+  register: pgpool2_register_template1
+  become: true
+  become_user: "{{ pgpool2_user }}"
+  changed_when: false
+  failed_when:
+    - pgpool2_register_template1.rc > 0
+    - not pgpool2_register_template1.stderr is search('already exists')
+  when: pgpool2_node_role == 'primary'
+
+- name: pgpool2 | Online Recovery | stop postgresql on standby
+  service:
+    name: postgresql-{{ postgresql_version }}
+    state: stopped
+  when:
+    - pgpool2_node_role == 'standby'
+    - pgpool2_do_online_recovery|bool
+
+- name: pgpool2 | Online Recovery | Do online recovery
+  command: pcp_recovery_node -h {{ pgpool2_delegate_IP }} -U {{ pgpool2_pcp_user_name }} -p {{ pgpool2_pcp_port }} -w -n {{ pgpool2_node_index }}
+  register: pgpool2_pcp_recovery_node
+  until: pgpool2_pcp_recovery_node is succeeded
+  changed_when: false
+  when:
+    - pgpool2_node_role == 'standby'
+    - pgpool2_do_online_recovery|bool
+  delegate_to: "{{ ansible_play_batch|first }}"
+  become: true
+  become_user: "{{ pgpool2_user }}"
+
+- debug:
+    msg:
+      - "{{ pgpool2_pcp_recovery_node.stdout }}"
+      - "{{ pgpool2_pcp_recovery_node.stderr }}"
+  when: pgpool2_pcp_recovery_node.changed|bool

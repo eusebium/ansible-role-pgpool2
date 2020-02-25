@@ -1,0 +1,43 @@
+---
+- name: pgpool2 | Add PostgreSQL repository | yum
+  yum_repository:
+    name: postgresql
+    description: postgresql yum repo
+    baseurl: "{{ postgresql_yum_repository_baseurl }}"
+    gpgkey: "{{ postgresql_yum_repository_gpgkey }}"
+  when: postgresql_install_repository|bool
+
+- name: pgpool2 | Install pgpool2 | yum
+  yum:
+    name: "{{ pgpool2_packages }}"
+    state: present
+
+- name: pgpool2 | Custom service folder
+  file:
+    path: /etc/systemd/system/{{ pgpool2_service_name }}.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: pgpool2 | Custom service
+  copy:
+    content: |
+      [Service]
+      User={{ pgpool2_user }}
+      Group={{ pgpool2_group }}
+      StandardOutput=syslog
+      StandardError=syslog
+      SyslogIdentifier=pgpool
+    dest: /etc/systemd/system/{{ pgpool2_service_name }}.service.d/override.conf
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - systemd reload
+    - restart pgpool2
+
+- name: pgpool2 | Enable service
+  service:
+    name: "{{ pgpool2_service_name }}"
+    enabled: True

@@ -1,0 +1,31 @@
+---
+# handlers file for eusebium.pgpool2
+- name: systemd reload
+  systemd:
+    daemon_reload: true
+
+- name: start pgpool2
+  service:
+    name: "{{ pgpool2_service_name }}"
+    state: started
+    enabled: yes
+
+- name: stop pgpool2
+  service:
+    name: "{{ pgpool2_service_name }}"
+    state: stopped
+
+- name: restart pgpool2
+  service:
+    name: "{{ pgpool2_service_name }}"
+    state: restarted
+
+- name: reload pgpool2
+  service:
+    name: "{{ pgpool2_service_name }}"
+    state: reloaded
+
+- name: restart rsyslog
+  service:
+    name: rsyslog
+    state: restarted

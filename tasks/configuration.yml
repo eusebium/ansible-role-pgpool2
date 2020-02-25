@@ -1,0 +1,155 @@
+---
+- name: pgpool2 | Configuration | /etc/sysconfig/pgpool-II-{{ postgresql_version }}
+  lineinfile:
+    path: /etc/sysconfig/pgpool-II-{{ postgresql_version }}
+    regexp: '^OPTS='
+    line: 'OPTS=" -D -n -d"'
+  notify:
+    - restart pgpool2
+
+- name: pgpool2 | main configuration file {{ pgpool2_conf_directory }}/pgpool.conf
+  template:
+    src: "{{ pgpool2_templates_version }}/pgpool.conf.j2"
+    dest: "{{ pgpool2_conf_directory }}/pgpool.conf"
+    owner: "{{ pgpool2_user }}"
+    group: "{{ pgpool2_group }}"
+    mode: 0640
+  notify:
+    - restart pgpool2
+
+- name: pgpool2 | Configuration | PCP Command | pcp.conf
+  template:
+    src: pcp.conf.j2
+    dest: "{{ pgpool2_conf_directory }}/pcp.conf"
+    owner: "{{ pgpool2_user }}"
+    group: "{{ pgpool2_group }}"
+    mode: 0640
+
+- name: pgpool2 | Configuration | .pcppass - root
+  copy:
+    content: |
+      {{ pgpool2_delegate_IP | regex_replace("'") }}:{{ pgpool2_pcp_port }}:{{ pgpool2_pcp_user_name }}:{{ pgpool2_pcp_user_password }}
+    dest: ~root/.pcppass
+    owner: root
+    group: root
+    mode: 0600
+
+- name: pgpool2 | Configuration | .pcppass - {{ pgpool2_user }}
+  copy:
+    content: |
+      {{ pgpool2_delegate_IP | regex_replace("'") }}:{{ pgpool2_pcp_port }}:{{ pgpool2_pcp_user_name }}:{{ pgpool2_pcp_user_password }}
+    dest: ~{{ pgpool2_user }}/.pcppass
+    owner: "{{ pgpool2_user }}"
+    group: "{{ pgpool2_group }}"
+    mode: 0600
+
+- name: pgpool2 | Configuration | Client Authentication Configuration | pool_hba.conf
+  template:
+    src: pool_hba.conf.j2
+    dest: "{{ pgpool2_conf_directory }}/pool_hba.conf"
+    owner: "{{ pgpool2_user }}"
+    group: "{{ pgpool2_group }}"
+    mode: 0640
+  when: pgpool2_enable_pool_hba|bool
+  notify:
+    - restart pgpool2
+
+- name: pgpool2 | Configuration | Client Authentication Configuration | pool_passwd | md5
+  copy:
+    dest: "{{ pgpool2_conf_directory }}/{{ pgpool2_pool_passwd }}"
+    owner: "{{ pgpool2_user }}"
+    group: "{{ pgpool2_group }}"
+    mode: 0640
+    content: |
+      {% for user in pgpool2_pool_users %}
+      {{ user.name }}:md5{{ (user.pass + user.name) | hash('md5') }}
+      {% endfor %}
+  when: pgpool2_enable_pool_hba|bool
+  notify:
+    - reload pgpool2
+
+- name: pgpool2 | Configuration | Failover configuration | failover.sh
+  copy:
+    src: "{{ pgpool2_conf_directory }}/failover.sh.sample"
+    dest: "{{ pgpool2_conf_directory }}/failover.sh"
+    remote_src: yes
+    force: no
+    owner: "{{ pgpool2_user }}"
+    group: "{{ pgpool2_group }}"
+    mode: 0750
+  when: pgpool2_failover_command != ''
+  notify:
+    - restart pgpool2
+
+- name: pgpool2 | Configuration | Failover configuration | failover.sh - PGHOME
+  lineinfile:
+    path: "{{ pgpool2_conf_directory }}/failover.sh"
+    regexp: '^PGHOME'
+    line: "PGHOME=/usr/pgsql-{{ postgresql_version }}"
+  when: pgpool2_failover_command != ''
+  notify:
+    - restart pgpool2
+
+- name: pgpool2 | Configuration | Failover configuration | follow_master.sh
+  copy:
+    src: "{{ pgpool2_conf_directory }}/follow_master.sh.sample"
+    dest: "{{ pgpool2_conf_directory }}/follow_master.sh"
+    remote_src: yes
+    force: no
+    owner: "{{ pgpool2_user }}"
+    group: "{{ pgpool2_group }}"
+    mode: 0750
+  when: pgpool2_follow_master_command != ''
+  notify:
+    - restart pgpool2
+
+- name: pgpool2 | Configuration | Failover configuration | follow_master.sh - PGHOME
+  lineinfile:
+    path: "{{ pgpool2_conf_directory }}/follow_master.sh"
+    regexp: '^PGHOME'
+    line: "PGHOME=/usr/pgsql-{{ postgresql_version }}"
+  when: pgpool2_follow_master_command != ''
+  notify:
+    - restart pgpool2
+
+- name: pgpool2 | Configuration | Watchdog Configuration | postgres sudoers
+  copy:
+    content: |
+      Cmnd_Alias NETCFG_CMD = /sbin/ip, /sbin/ifconfig, /usr/sbin/arping
+      {{ pgpool2_user }} ALL=(ALL) NOPASSWD: NETCFG_CMD
+    dest: /etc/sudoers.d/{{ pgpool2_user }}
+    owner: root
+    group: root
+    mode: 0440
+  when: pgpool2_use_watchdog|bool
+
+- name: pgpool2 | Configuration | Logging | /var/log
+  file:
+    path: /var/log/pgpool-II-{{ postgresql_version }}
+    state: directory
+    owner: "{{ pgpool2_user }}"
+    group: "{{ pgpool2_group }}"
+    mode: 0750
+
+- name: pgpool2 | Configuration | Logging | rsyslog
+  copy:
+    content: |
+      {{ pgpool2_syslog_facility }}.*  /var/log/pgpool-II-{{ postgresql_version }}/pgpool.log
+    dest: /etc/rsyslog.d/pgpool.conf
+  when: pgpool2_log_destination is search('syslog')
+  notify:
+    - restart rsyslog
+
+- name: pgpool2 | Configuration | grant pg_monitor
+  command: psql -c "GRANT pg_monitor TO pgpool;"
+  register: pgpool2_register_pg_monitor
+  become: true
+  become_user: "{{ pgpool2_user }}"
+  changed_when: false
+  failed_when:
+    - pgpool2_register_pg_monitor.rc > 0
+    - not pgpool2_register_pg_monitor.stderr is search('read-only')
+  ignore_errors: True
+
+- debug:
+    var: pgpool2_register_pg_monitor

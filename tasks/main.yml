@@ -1,0 +1,10 @@
+---
+# tasks file for eusebium.pgpool2
+- import_tasks: install.yml
+  tags: [pgpool2, pgpool2-install]
+
+- import_tasks: configuration.yml
+  tags: [pgpool2, pgpool2-config]
+
+- import_tasks: online_recovery.yml
+  tags: [pgpool2, pgpool2-recovery]
