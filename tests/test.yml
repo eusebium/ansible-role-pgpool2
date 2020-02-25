@@ -1,5 +1,104 @@
 ---
-- hosts: localhost
-  remote_user: root
+- hosts: all
+  become: yes
+  vars:
+    pgpool2_do_online_recovery: True
+    pgpool2_listen_addresses: '*'
+    pgpool2_sr_check_user: pgpool
+    pgpool2_pid_file_name: /var/run/postgresql/pgpool.pid
+    pgpool2_health_check_period: 5
+    pgpool2_health_check_timeout: 30
+    pgpool2_health_check_user: pgpool
+    pgpool2_health_check_max_retries: 3
+    pgpool2_failover_command: '/etc/pgpool-II-10/failover.sh %d %h %p %D %m %H %M %P %r %R %N %S'
+    pgpool2_follow_master_command: '/etc/pgpool-II-10/follow_master.sh %d %h %p %D %m %M %H %P %r %R'
+    pgpool2_recovery_user: postgres
+    pgpool2_recovery_password: 'Password01'
+    pgpool2_recovery_1st_stage_command: 'recovery_1st_stage'
+    pgpool2_enable_pool_hba: on
+    pgpool2_use_watchdog: on
+    pgpool2_delegate_IP: '192.168.10.10'
+    pgpool2_if_up_cmd: '/usr/bin/sudo /sbin/ip addr add $_IP_$/24 dev eth1 label eth1:0'
+    pgpool2_if_down_cmd: '/usr/bin/sudo /sbin/ip addr del $_IP_$/24 dev eth1'
+    pgpool2_arping_cmd: '/usr/bin/sudo /usr/sbin/arping -U $_IP_$ -w 1 -I eth1'
+    pgpool2_wd_hostname: '{{ ansible_eth1.ipv4.address }}'
+    pgpool2_wd_port: 9000
+    pgpool2_log_destination: 'syslog,stderr'
+    pgpool2_syslog_facility: 'LOCAL1'
+    pgpool2_backends:
+      - hostname: p1
+        port: 5432
+        weight: 1
+        data_directory: /var/lib/pgsql/10/data
+        flag: ALLOW_TO_FAILOVER
+        application_name: p1
+      - hostname: p2
+        port: 5432
+        weight: 1
+        data_directory: /var/lib/pgsql/10/data
+        flag: ALLOW_TO_FAILOVER
+        application_name: p2
+      - hostname: p3
+        port: 5432
+        weight: 1
+        data_directory: /var/lib/pgsql/10/data
+        flag: ALLOW_TO_FAILOVER
+        application_name: p3
+    pgpool2_heartbeat_nodes:
+      - hostname: p1
+        address: 192.168.10.11
+        port: 9694
+        device: ''
+      - hostname: p2
+        address: 192.168.10.12
+        port: 9694
+        device: ''
+      - hostname: p3
+        address: 192.168.10.13
+        port: 9694
+        device: ''
+    pgpool2_query_nodes:
+      - hostname: p1
+        address: 192.168.10.11
+        port: 9999
+        wd_port: 9000
+      - hostname: p2
+        address: 192.168.10.12
+        port: 9999
+        wd_port: 9000
+      - hostname: p3
+        address: 192.168.10.13
+        port: 9999
+        wd_port: 9000
+    pgpool2_hba_custom:
+      - comment: Connect pgpool
+        type: host
+        database: all
+        user: pgpool
+        address: "0.0.0.0/0"
+        method: md5
+      - comment: Connect postgres
+        type: host
+        database: all
+        user: postgres
+        address: "0.0.0.0/0"
+        method: md5
+    pgpool2_pool_users:
+      - name: postgres
+        pass: Password01
+      - name: pgpool
+        pass: Password01
+    pgpool2_pcp_user_name: pcpAdmin
+    pgpool2_pcp_user_password: Password01
+    # pgpool2_num_init_children: 1
+    # pgpool2_log_error_verbosity: verbose
+    # pgpool2_client_min_messages: debug5
+    # pgpool2_log_min_messages: debug5
+    # pgpool2_log_connections: on
+    # pgpool2_log_hostname: on
+    # pgpool2_log_statement: on
+    # pgpool2_log_per_node_statement: on
+    # pgpool2_log_client_messages: on
+
   roles:
-    - eusebium.pgpool2
+    - role: eusebium.pgpool2
