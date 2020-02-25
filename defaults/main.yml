@@ -1,11 +1,13 @@
 ---
 # defaults file for eusebium.pgpool2
 postgresql_version: 10
+postgresql_archive_directory: "/var/lib/pgsql/archivedir"
+postgresql_data_directory: /var/lib/pgsql/10/data
+postgresql_install_repository: true
+
 pgpool2_templates_version: 4.1
 
-postgresql_install_repository: true
 pgpool2_conf_directory: /etc/pgpool-II-{{ postgresql_version }}
-pgpool2_postgresql_data_directory: /var/lib/pgsql/10/data
 pgpool2_service_name: pgpool-II-{{ postgresql_version }}
 pgpool2_do_online_recovery: False
 

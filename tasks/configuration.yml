@@ -91,11 +91,9 @@
     - restart pgpool2
 
 - name: pgpool2 | Configuration | Failover configuration | follow_master.sh
-  copy:
-    src: "{{ pgpool2_conf_directory }}/follow_master.sh.sample"
+  template:
+    src: "{{ pgpool2_templates_version }}/follow_master.sh.j2"
     dest: "{{ pgpool2_conf_directory }}/follow_master.sh"
-    remote_src: yes
-    force: no
     owner: "{{ pgpool2_user }}"
     group: "{{ pgpool2_group }}"
     mode: 0750
@@ -103,19 +101,10 @@
   notify:
     - restart pgpool2
 
-- name: pgpool2 | Configuration | Failover configuration | follow_master.sh - PGHOME
-  lineinfile:
-    path: "{{ pgpool2_conf_directory }}/follow_master.sh"
-    regexp: '^PGHOME'
-    line: "PGHOME=/usr/pgsql-{{ postgresql_version }}"
-  when: pgpool2_follow_master_command != ''
-  notify:
-    - restart pgpool2
-
 - name: pgpool2 | Configuration | Watchdog Configuration | postgres sudoers
   copy:
     content: |
-      Cmnd_Alias POSTGRES_CMD = /sbin/ip, /sbin/ifconfig, /usr/sbin/arping, /bin/systemctl start {{ pgpool2_service_name }}
+      Cmnd_Alias POSTGRES_CMD = /sbin/ip, /sbin/ifconfig, /usr/sbin/arping, /bin/systemctl start postgresql-{{ postgresql_version }}
       {{ pgpool2_user }} ALL=(ALL) NOPASSWD: POSTGRES_CMD
     dest: /etc/sudoers.d/{{ pgpool2_user }}
     owner: root

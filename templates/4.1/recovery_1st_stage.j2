@@ -12,8 +12,8 @@ DEST_NODE_ID="$5"
 DEST_NODE_PORT="$6"
 
 PRIMARY_NODE_HOST=$(hostname)
-PGHOME=/usr/pgsql-11
-ARCHIVEDIR=/var/lib/pgsql/archivedir
+PGHOME=/usr/pgsql-{{ postgresql_version }}
+ARCHIVEDIR={{ postgresql_archive_directory }}
 REPLUSER=repl
 
 logger -i -p local1.info recovery_1st_stage: start: pg_basebackup for Standby node $DEST_NODE_ID

@@ -4,12 +4,6 @@
   systemd:
     daemon_reload: true
 
-- name: start pgpool2
-  service:
-    name: "{{ pgpool2_service_name }}"
-    state: started
-    enabled: yes
-
 - name: stop pgpool2
   service:
     name: "{{ pgpool2_service_name }}"

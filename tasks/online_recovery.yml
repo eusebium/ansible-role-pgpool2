@@ -1,6 +1,13 @@
 ---
 - meta: flush_handlers
 
+- name: pgpool2 | start pgpool2
+  shell: sleep {{ 10 | random }} && /bin/systemctl start {{ pgpool2_service_name }}
+  changed_when: false
+  # delegate_to: "{{ item }}"
+  # loop: "{{ ansible_play_batch }}"
+  # run_once: true
+
 - name: pgpool2 | Online Recovery | wait for vip
   wait_for:
     host: "{{ pgpool2_delegate_IP }}"
@@ -24,45 +31,16 @@
   loop: "{{ pgpool2_register_node_info.results }}"
 
 - name: pgpool2 | Online Recovery | recovery_1st_stage
-  copy:
-    src: "{{ pgpool2_conf_directory }}/recovery_1st_stage.sample"
-    dest: "{{ pgpool2_postgresql_data_directory }}/recovery_1st_stage"
-    remote_src: yes
-    force: no
+  template:
+    src: "{{ pgpool2_templates_version }}/recovery_1st_stage.j2"
+    dest: "{{ postgresql_data_directory }}/recovery_1st_stage"
     mode: 0755
-
-- name: pgpool2 | Online Recovery | recovery_1st_stage - PGHOME
-  lineinfile:
-    path: "{{ pgpool2_postgresql_data_directory }}/recovery_1st_stage"
-    regexp: '^PGHOME'
-    line: "PGHOME=/usr/pgsql-{{ postgresql_version }}"
 
 - name: pgpool2 | Online Recovery | pgpool_remote_start
-  copy:
-    src: "{{ pgpool2_conf_directory }}/pgpool_remote_start.sample"
-    dest: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
-    remote_src: yes
-    force: no
+  template:
+    src: "{{ pgpool2_templates_version }}/pgpool_remote_start.j2"
+    dest: "{{ postgresql_data_directory }}/pgpool_remote_start"
     mode: 0755
-
-- name: pgpool2 | Online Recovery | pgpool_remote_start - PGHOME
-  lineinfile:
-    path: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
-    regexp: '^PGHOME'
-    line: "PGHOME=/usr/pgsql-{{ postgresql_version }}"
-
-- name: pgpool2 | Online Recovery | pgpool_remote_start - pgpool_remote_start
-  lineinfile:
-    path: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
-    regexp: '(?!#)(.*pg_ctl.*)'
-    line: '#\1'
-    backrefs: yes
-
-- name: pgpool2 | Online Recovery | pgpool_remote_start - pgpool_remote_start
-  lineinfile:
-    path: "{{ pgpool2_postgresql_data_directory }}/pgpool_remote_start"
-    insertafter: '.*pg_ctl.*'
-    line: 'sudo /bin/systemctl start {{ pgpool2_service_name }}'
 
 - name: pgpool2 | Online Recovery | mod template1
   command: psql template1 -c "CREATE EXTENSION pgpool_recovery"
@@ -84,7 +62,7 @@
     - pgpool2_do_online_recovery|bool
 
 - name: pgpool2 | Online Recovery | Do online recovery
-  command: pcp_recovery_node -h {{ pgpool2_delegate_IP }} -U {{ pgpool2_pcp_user_name }} -p {{ pgpool2_pcp_port }} -w -n {{ pgpool2_node_index }}
+  shell: sleep {{ 10 | random }} && pcp_recovery_node -h {{ pgpool2_delegate_IP }} -U {{ pgpool2_pcp_user_name }} -p {{ pgpool2_pcp_port }} -w -n {{ pgpool2_node_index }}
   register: pgpool2_pcp_recovery_node
   until: pgpool2_pcp_recovery_node is succeeded
   changed_when: false
@@ -99,4 +77,5 @@
     msg:
       - "{{ pgpool2_pcp_recovery_node.stdout }}"
       - "{{ pgpool2_pcp_recovery_node.stderr }}"
-  when: pgpool2_pcp_recovery_node.changed|bool
+  ignore_errors: true
+  # when: pgpool2_pcp_recovery_node.changed|bool
