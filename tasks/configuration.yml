@@ -139,3 +139,15 @@
     - pgpool2_register_pg_monitor.rc > 0
     - not pgpool2_register_pg_monitor.stderr is search('read-only')
   ignore_errors: True
+
+- meta: flush_handlers
+
+- pause:
+    seconds: 5
+
+- name: pgpool2 | start pgpool2
+  shell: sleep {{ 10 | random }} && /bin/systemctl start {{ pgpool2_service_name }}
+  changed_when: false
+  # delegate_to: "{{ item }}"
+  # loop: "{{ ansible_play_batch }}"
+  # run_once: true

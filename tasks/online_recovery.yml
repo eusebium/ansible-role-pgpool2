@@ -1,13 +1,4 @@
 ---
-- meta: flush_handlers
-
-- name: pgpool2 | start pgpool2
-  shell: sleep {{ 10 | random }} && /bin/systemctl start {{ pgpool2_service_name }}
-  changed_when: false
-  # delegate_to: "{{ item }}"
-  # loop: "{{ ansible_play_batch }}"
-  # run_once: true
-
 - name: pgpool2 | Online Recovery | wait for vip
   wait_for:
     host: "{{ pgpool2_delegate_IP }}"
@@ -60,6 +51,9 @@
   when:
     - pgpool2_node_role == 'standby'
     - pgpool2_do_online_recovery|bool
+
+- pause:
+    seconds: 5
 
 - name: pgpool2 | Online Recovery | Do online recovery
   shell: sleep {{ 10 | random }} && pcp_recovery_node -h {{ pgpool2_delegate_IP }} -U {{ pgpool2_pcp_user_name }} -p {{ pgpool2_pcp_port }} -w -n {{ pgpool2_node_index }}
