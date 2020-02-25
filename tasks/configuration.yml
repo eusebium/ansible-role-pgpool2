@@ -25,10 +25,11 @@
     group: "{{ pgpool2_group }}"
     mode: 0640
 
-- name: pgpool2 | Configuration | .pcppass - root
+- name: pgpool2 | Configuration | .pcppass
   copy:
     content: |
       {{ pgpool2_delegate_IP | regex_replace("'") }}:{{ pgpool2_pcp_port }}:{{ pgpool2_pcp_user_name }}:{{ pgpool2_pcp_user_password }}
+      localhost:{{ pgpool2_pcp_port }}:{{ pgpool2_pcp_user_name }}:{{ pgpool2_pcp_user_password }}
     dest: ~root/.pcppass
     owner: root
     group: root
@@ -38,6 +39,7 @@
   copy:
     content: |
       {{ pgpool2_delegate_IP | regex_replace("'") }}:{{ pgpool2_pcp_port }}:{{ pgpool2_pcp_user_name }}:{{ pgpool2_pcp_user_password }}
+      localhost:{{ pgpool2_pcp_port }}:{{ pgpool2_pcp_user_name }}:{{ pgpool2_pcp_user_password }}
     dest: ~{{ pgpool2_user }}/.pcppass
     owner: "{{ pgpool2_user }}"
     group: "{{ pgpool2_group }}"
@@ -142,12 +144,6 @@
 
 - meta: flush_handlers
 
-- pause:
-    seconds: 5
-
-- name: pgpool2 | start pgpool2
-  shell: sleep {{ 10 | random }} && /bin/systemctl start {{ pgpool2_service_name }}
+- name: restart pgpool2
+  shell: sleep {{ 20 | random(step=4) }} && /bin/systemctl start {{ pgpool2_service_name }}
   changed_when: false
-  # delegate_to: "{{ item }}"
-  # loop: "{{ ansible_play_batch }}"
-  # run_once: true

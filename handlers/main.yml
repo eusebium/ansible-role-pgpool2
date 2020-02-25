@@ -9,10 +9,10 @@
     name: "{{ pgpool2_service_name }}"
     state: stopped
 
-- name: restart pgpool2
-  service:
-    name: "{{ pgpool2_service_name }}"
-    state: restarted
+# - name: restart pgpool2
+#   service:
+#     name: "{{ pgpool2_service_name }}"
+#     state: restarted
 
 - name: reload pgpool2
   service:
@@ -23,3 +23,7 @@
   service:
     name: rsyslog
     state: restarted
+
+- name: restart pgpool2
+  shell: sleep {{ 20 | random(step=4) }} && /bin/systemctl restart {{ pgpool2_service_name }}
+  changed_when: false
