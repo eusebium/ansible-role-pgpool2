@@ -146,7 +146,7 @@ EOT
     if [ $? -eq 0 ]; then
 
         # Run pcp_attact_node to attach Standby node to Pgpool-II.
-        ${PGPOOL_PATH}/pcp_attach_node -w -h {{ pgpool2_delegate_IP }} -U $PCP_USER -p ${PCP_PORT} -n ${FAILED_NODE_ID}
+        ${PGPOOL_PATH}/pcp_attach_node -w -h localhost -U $PCP_USER -p ${PCP_PORT} -n ${FAILED_NODE_ID}
 
         if [ $? -ne 0 ]; then
                 logger -i -p local1.error follow_master.sh: end: pcp_attach_node failed
