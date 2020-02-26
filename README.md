@@ -1,22 +1,146 @@
-Role Name
+pgpool2
 =========
 
-A brief description of the role goes here.
+Install and configure pgpool2
 
 Requirements
 ------------
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+None
 
 Role Variables
 --------------
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+postgresql_version: 10
+postgresql_archive_directory: "/var/lib/pgsql/archivedir"
+postgresql_data_directory: /var/lib/pgsql/10/data
+postgresql_install_repository: true
+pgpool2_templates_version: 4.1 - Nedded for template path.
+pgpool2_do_online_recovery: False - If you want to automatically recover standby nodes set True
+pgpool2_pcp_user_name: pcpAdmin - PCP account
+pgpool2_pcp_user_password: Password01
+
+pgpool2_backends: [] - Use short hostname not ip.
+
+Other variables in `defaults/main.yml`
 
 Dependencies
 ------------
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+2 or 3 postgres nodes.
+I use role anxs.postgresql:
+
+```
+---
+- hosts: all
+  become: yes
+  vars:
+    postgresql_version: 10
+    postgresql_listen_addresses:
+      - '*'
+    postgresql_archive_mode: 'on'
+    postgresql_archive_command: 'cp "%p" "/var/lib/pgsql/archivedir/%f"'
+    postgresql_archive_directory: "/var/lib/pgsql/archivedir"
+    postgresql_max_wal_senders: 10
+    postgresql_max_replication_slots: 10
+    postgresql_wal_level: 'replica'
+    postgresql_hot_standby: 'on'
+    postgresql_wal_log_hints: 'on'
+    postgresql_conf_directory: "{{ postgresql_data_directory }}"
+    postgresql_users:
+      - name: pgpool
+        pass: md5039da4166f728631cf4c0f77a94c4ed5
+        encrypted: yes
+        groups:
+          - pg_monitor
+      - name: repl
+        pass: md509dd76719cafeb56a0d32fe1cf5f04c1
+        encrypted: yes
+      - name: postgres
+        pass: md5d17ea122f200c78f655c5d8dcf49eac1
+        encrypted: yes
+    postgresql_user_privileges:
+      - name: pgpool
+        role_attr_flags: LOGIN
+      - name: repl
+        role_attr_flags: REPLICATION,LOGIN
+
+  roles:
+    - eusebium.anxs.postgresql
+
+  post_tasks:
+    - name: Add all to pg_hba.conf
+      lineinfile:
+        path: /var/lib/pgsql/10/data/pg_hba.conf
+        line: 'host    all             all             samenet                 md5'
+
+    - name: Add replication to pg_hba.conf
+      lineinfile:
+        path: /var/lib/pgsql/10/data/pg_hba.conf
+        line: 'host    replication     all             samenet                 md5'
+
+    - name: Create .pgpass replication
+      lineinfile:
+        dest: ~/.pgpass
+        line: '{{ ansible_hostname }}:5432:replication:repl:Password01'
+        create: yes
+        mode: 0600
+      become_user: postgres
+      delegate_to: "{{ item }}"
+      loop: "{{ ansible_play_batch }}"
+
+    - name: Create .pgpass postgres
+      lineinfile:
+        dest: ~/.pgpass
+        line: '{{ ansible_hostname }}:5432:postgres:postgres:Password01'
+        create: yes
+        mode: 0600
+      become_user: postgres
+      delegate_to: "{{ item }}"
+      loop: "{{ ansible_play_batch }}"
+
+    - name: Update /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ item }}"
+      loop:
+        - '192.168.10.11 p1'
+        - '192.168.10.12 p2'
+        - '192.168.10.13 p3'
+
+    - name: Restart postgres
+      service:
+        name: postgresql-10
+        state: restarted
+
+```
+
+SSH passwordless:
+
+```
+---
+- hosts: all
+  roles:
+    - role: eusebium.ssh_keys
+      ssh_keys_keypair_name: id_rsa_pgpool
+      ssh_keys_keypair_owner: postgres
+      ssh_keys_authorized_keys_owner: postgres
+
+- hosts: all
+  roles:
+    - role: eusebium.ssh_keys
+      ssh_keys_keypair_name: id_rsa
+      ssh_keys_keypair_owner: postgres
+      ssh_keys_authorized_keys_owner: postgres
+
+- hosts: all
+  roles:
+    - role: eusebium.ssh_keys
+      ssh_keys_keypair_name: id_rsa_pgpool
+      ssh_keys_keypair_owner: root
+      ssh_keys_authorized_keys_owner: postgres
+```
+
 
 Example Playbook
 ----------------
