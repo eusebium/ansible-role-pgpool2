@@ -144,6 +144,6 @@
 
 - meta: flush_handlers
 
-- name: restart pgpool2
+- name: start pgpool2
   shell: sleep {{ 20 | random(step=4) }} && /bin/systemctl start {{ pgpool2_service_name }}
   changed_when: false
